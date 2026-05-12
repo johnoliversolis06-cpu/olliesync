@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and preferences.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "focusInterval": { "type": "integer" },
+        "breakInterval": { "type": "integer" },
+        "autoCutoffDuration": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "theme"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "A recurring activity to track.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "archived": { "type": "boolean" }
+      },
+      "required": ["userId", "title", "frequency", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A one-time task.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "completed", "createdAt"]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "A record of activity completion.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "entityId": { "type": "string" },
+        "type": { "type": "string", "enum": ["habit", "task"] },
+        "date": { "type": "string", "format": "date" },
+        "timeSpent": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "entityId", "date", "timeSpent", "timestamp"]
+    },
+    "BudgetItem": {
+      "title": "BudgetItem",
+      "description": "A financial transaction.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "amount", "type", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/habits/{habitId}": { "schema": "Habit", "description": "Habit definitions" },
+    "/tasks/{taskId}": { "schema": "Task", "description": "One-off tasks" },
+    "/logs/{logId}": { "schema": "Log", "description": "Activity logs" },
+    "/budget/{budgetId}": { "schema": "BudgetItem", "description": "Budget entries" }
+  }
+}

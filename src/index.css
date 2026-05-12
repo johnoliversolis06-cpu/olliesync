@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --app-primary: #2563eb; /* blue-600 */
+}
+
+.dark {
+  --app-primary: #0CAF89; /* teal */
+}
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --color-teal: var(--app-primary);
+  --color-purple: #8154E8;
+  --color-coral: #E34A4A;
+  --color-sun: #F2C037;
+  --color-navy: #1C1E21;
+  --color-deep: #242526;
+
+  
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+}
+
+@layer base {
+  body {
+    @apply text-slate-800 transition-colors duration-300;
+    background-color: #F0F2F5;
+  }
+  .dark body {
+    @apply text-slate-100;
+    background-color: #18191A;
+  }
+}
+

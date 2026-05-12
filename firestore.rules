@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Helpers
+    function isValidUser(data) {
+      return data.email is string && data.theme in ['light', 'dark'] && 
+             (data.get('focusInterval', 25) is int) &&
+             (data.get('breakInterval', 5) is int) &&
+             (data.get('autoCutoffDuration', 60) is int);
+    }
+
+    function isValidHabit(data) {
+      return data.userId == request.auth.uid && 
+             data.title is string && data.title.size() <= 200 &&
+             data.frequency in ['daily', 'weekly', 'monthly'];
+    }
+
+    function isValidTask(data) {
+      return data.userId == request.auth.uid && 
+             data.title is string && data.title.size() <= 200 &&
+             data.completed is bool;
+    }
+
+    function isValidLog(data) {
+      return data.userId == request.auth.uid && 
+             isValidId(data.entityId) &&
+             data.type in ['habit', 'task'] &&
+             data.timeSpent is number;
+    }
+
+    function isValidBudgetItem(data) {
+      return data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.amount is number && data.amount >= 0 &&
+             data.type in ['income', 'expense'];
+    }
+
+    // Collection rules
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().email == existing().email;
+    }
+
+    match /habits/{habitId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() && isValidHabit(incoming());
+      allow update: if isOwner(existing().userId) && isValidHabit(incoming()) &&
+                    incoming().userId == existing().userId;
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /tasks/{taskId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() && isValidTask(incoming());
+      allow update: if isOwner(existing().userId) && isValidTask(incoming()) &&
+                    incoming().userId == existing().userId;
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /logs/{logId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() && isValidLog(incoming());
+      allow update: if isOwner(existing().userId) && isValidLog(incoming()) &&
+                    incoming().userId == existing().userId;
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /budget/{budgetId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() && isValidBudgetItem(incoming());
+      allow update: if isOwner(existing().userId) && isValidBudgetItem(incoming()) &&
+                    incoming().userId == existing().userId;
+      allow delete: if isOwner(existing().userId);
+    }
+  }
+}

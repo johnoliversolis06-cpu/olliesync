@@ -1,0 +1,6 @@
+{
+  "name": "OllieSync: activity tracker",
+  "description": "A vibrant, personal development app featuring activity tracking, Pomodoro focus, habits, and budget management.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["Task Management", "Time Tracking", "Analytics", "Financial Modeling"]
+}
