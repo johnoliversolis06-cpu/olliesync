@@ -5,6 +5,7 @@ import { TimerProvider } from './lib/TimerContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Journal from './pages/Journal';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Focus from './pages/Focus';
@@ -28,6 +29,7 @@ const AuthenticatedApp: React.FC = () => {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/journal" element={<Journal />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/habits" element={<Habits />} />
           <Route path="/focus" element={<Focus />} />

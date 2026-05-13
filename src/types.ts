@@ -59,6 +59,17 @@ export type BudgetItem = {
   createdAt: any;
 };
 
+export type JournalEntry = {
+  id: string;
+  userId: string;
+  content: string; // Markdown or plain text
+  mood: 'great' | 'good' | 'neutral' | 'bad' | 'awful' | null;
+  tags: string[];
+  date: string; // YYYY-MM-DD
+  createdAt: any;
+  updatedAt: any;
+};
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

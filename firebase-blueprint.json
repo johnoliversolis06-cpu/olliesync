@@ -73,6 +73,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "title", "amount", "type", "date", "createdAt"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "A personal journal or markdown note entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "mood": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "content", "date", "createdAt"]
     }
   },
   "firestore": {
@@ -80,6 +95,7 @@
     "/habits/{habitId}": { "schema": "Habit", "description": "Habit definitions" },
     "/tasks/{taskId}": { "schema": "Task", "description": "One-off tasks" },
     "/logs/{logId}": { "schema": "Log", "description": "Activity logs" },
-    "/budget/{budgetId}": { "schema": "BudgetItem", "description": "Budget entries" }
+    "/budget/{budgetId}": { "schema": "BudgetItem", "description": "Budget entries" },
+    "/journal/{entryId}": { "schema": "JournalEntry", "description": "Journal entries and notes" }
   }
 }

@@ -61,6 +61,13 @@ service cloud.firestore {
              data.type in ['income', 'expense'];
     }
 
+    function isValidJournalEntry(data) {
+      return data.userId == request.auth.uid &&
+             data.content is string && 
+             (data.mood == null || data.mood in ['great', 'good', 'neutral', 'bad', 'awful']) &&
+             data.tags is list && data.tags.size() <= 20;
+    }
+
     // Collection rules
     match /users/{userId} {
       allow get: if isOwner(userId);
@@ -101,6 +108,15 @@ service cloud.firestore {
       allow get: if isOwner(existing().userId);
       allow create: if isSignedIn() && isValidBudgetItem(incoming());
       allow update: if isOwner(existing().userId) && isValidBudgetItem(incoming()) &&
+                    incoming().userId == existing().userId;
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /journal/{entryId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() && isValidJournalEntry(incoming());
+      allow update: if isOwner(existing().userId) && isValidJournalEntry(incoming()) &&
                     incoming().userId == existing().userId;
       allow delete: if isOwner(existing().userId);
     }
