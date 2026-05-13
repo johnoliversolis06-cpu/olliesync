@@ -16,6 +16,9 @@ const Dashboard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [stats, setStats] = useState({ focusTime: 0, completedTasks: 0, remainingTasks: 0 });
+  const [logs, setLogs] = useState<any[]>([]);
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     const init = async () => {
@@ -45,6 +48,11 @@ const Dashboard: React.FC = () => {
       setHabits(h.slice(0, 5));
     });
 
+    // Listen to logs
+    const unsubLogs = onSnapshot(query(collection(db, 'logs'), where('userId', '==', user.uid)), (snap) => {
+      setLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     // Compute basic stats
     const fetchStats = async () => {
        const logsSnap = await getDocs(query(collection(db, 'logs'), where('userId', '==', user.uid)));
@@ -60,6 +68,7 @@ const Dashboard: React.FC = () => {
     return () => {
       unsubTasks();
       unsubHabits();
+      unsubLogs();
     };
   }, [user]);
 
@@ -68,6 +77,30 @@ const Dashboard: React.FC = () => {
       completed: !task.completed
     });
     setStats(prev => ({ ...prev, completedTasks: prev.completedTasks + 1 }));
+  };
+
+  const toggleToday = async (habitId: string) => {
+    if (!user) return;
+    const isCompleted = logs.some(l => l.entityId === habitId && l.date === todayStr);
+    if (isCompleted) {
+      const log = logs.find(l => l.entityId === habitId && l.date === todayStr);
+      if (log) {
+        // Need to import deleteDoc and addDoc
+        const { deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(db, 'logs', log.id));
+      }
+    } else {
+      const { addDoc, serverTimestamp } = await import('firebase/firestore');
+      await addDoc(collection(db, 'logs'), {
+        userId: user.uid,
+        entityId: habitId,
+        type: 'habit',
+        date: todayStr,
+        timeSpent: 0,
+        completed: true,
+        timestamp: serverTimestamp()
+      });
+    }
   };
 
   const formatHours = (mins: number) => {
@@ -183,28 +216,42 @@ const Dashboard: React.FC = () => {
           
           <div className="space-y-2">
              <AnimatePresence>
-                {habits.map(habit => (
+                {habits.map(habit => {
+                  const isCompletedToday = logs.some(l => l.entityId === habit.id && l.date === todayStr);
+
+                  return (
                   <motion.div 
                     layout
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     key={habit.id} 
-                    className="group bg-white dark:bg-[#242526] p-4 rounded-lg border border-slate-300 dark:border-[#3E4042] hover:border-purple/50 transition-all flex justify-between items-center shadow-md shadow-slate-200/50 dark:shadow-none"
+                    className={`group bg-white dark:bg-[#242526] p-4 rounded-lg border hover:border-purple/50 transition-all flex justify-between items-center shadow-md shadow-slate-200/50 dark:shadow-none ${
+                        isCompletedToday ? 'border-teal/50 bg-teal/5' : 'border-slate-300 dark:border-[#3E4042]'
+                    }`}
                   >
                     <div className="flex items-center gap-3 flex-1">
-                      <div className="w-1.5 h-6 rounded-full bg-slate-200 dark:bg-slate-700 group-hover:bg-purple transition-colors shrink-0" />
-                      <span className="font-medium text-base text-slate-800 dark:text-gray-200 line-clamp-1">{habit.title}</span>
+                      <button 
+                        onClick={() => toggleToday(habit.id)}
+                        className={`w-6 h-6 shrink-0 rounded-md flex items-center justify-center transition-all ${
+                          isCompletedToday 
+                            ? 'bg-teal text-white' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-300 hover:bg-slate-200'
+                        }`}
+                      >
+                        {isCompletedToday && <CheckCircle2 size={16} />}
+                      </button>
+                      <span className={`font-medium text-base text-slate-800 dark:text-gray-200 line-clamp-1 ${isCompletedToday ? 'text-teal' : ''}`}>{habit.title}</span>
                     </div>
                     <button 
-                      onClick={() => navigate('/focus', { state: { selectedEntity: `habit:${habit.id}` } })}
+                      onClick={(e) => { e.stopPropagation(); navigate('/focus', { state: { selectedEntity: `habit:${habit.id}` } })}}
                       className="ml-3 opacity-0 group-hover:opacity-100 bg-purple/10 text-purple p-2.5 rounded-md hover:bg-purple hover:text-white transition-all transform hover:scale-105 active:scale-95"
                       title="Focus on this"
                     >
                       <Play size={16} fill="currentColor" />
                     </button>
                   </motion.div>
-                ))}
+                )})}
              </AnimatePresence>
              {habits.length === 0 && (
                 <div className="py-8 text-center text-slate-400 font-medium bg-white dark:bg-[#242526] rounded-lg border border-dashed border-[#E4E6EB] dark:border-[#3E4042]">

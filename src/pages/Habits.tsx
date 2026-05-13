@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/auth';
+import { useTimer } from '../lib/TimerContext';
 import { Habit, Log } from '../types';
-import { Plus, Flame, Sparkles, Trash2, Check, Settings2, X, Search } from 'lucide-react';
+import { Plus, Flame, Sparkles, Trash2, Check, Settings2, X, Search, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PREDEFINED_ROUTINES } from '../constants/routines';
 import EditHabitModal from '../components/EditHabitModal';
 
 const HabitsPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { setSelectedEntity, setIsActive } = useTimer();
   const [habits, setHabits] = useState<Habit[]>([]);
   
   const [logs, setLogs] = useState<Log[]>([]);
@@ -204,6 +208,16 @@ const HabitsPage: React.FC = () => {
                     </div>
                     
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          navigate('/focus', { state: { selectedEntity: `habit:${habit.id}` } });
+                        }}
+                        title="Start Timer"
+                        className="p-2 text-slate-400 hover:text-teal hover:bg-teal/10 rounded-lg transition-all"
+                      >
+                        <Play size={18} />
+                      </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setEditingHabit(habit); }}
                         className="p-2 text-slate-400 hover:text-purple hover:bg-purple/10 rounded-lg transition-all"
