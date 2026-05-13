@@ -1,216 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Play, Pause, RotateCcw, Coffee, Brain, Sparkles, Settings2, Square } from 'lucide-react';
-import { useAuth } from '../lib/auth';
-import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { Task, Habit } from '../types';
-import { getRewardSuggestion } from '../services/gemini';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTimer } from '../lib/TimerContext';
 
 const FocusPage: React.FC = () => {
-  const { user, profile } = useAuth();
   const location = useLocation();
-  const [timerType, setTimerType] = useState<'pomodoro' | 'freestyle'>('pomodoro');
-  const [focusMins, setFocusMins] = useState(profile?.focusInterval || 25);
-  const [breakMins, setBreakMins] = useState(profile?.breakInterval || 5);
-  const [timeLeft, setTimeLeft] = useState((profile?.focusInterval || 25) * 60); // Used for pomodoro countdown
-  const [elapsedTime, setElapsedTime] = useState(0); // Used for freestyle stopwatch
-  const [isActive, setIsActive] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [mode, setMode] = useState<'focus' | 'break'>('focus');
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [selectedEntity, setSelectedEntity] = useState<string>(location.state?.selectedEntity || ''); // format: "task:ID" or "habit:ID"
-  const [reward, setReward] = useState<{ reward: string, message: string } | null>(null);
-  
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastReminderRef = useRef<number>(0);
-  const lastActivityRef = useRef<number>(Date.now());
+  const {
+    timerType, setTimerType,
+    focusMins, setFocusMins,
+    breakMins, setBreakMins,
+    timeLeft, setTimeLeft,
+    elapsedTime, setElapsedTime,
+    isActive, setIsActive,
+    mode, setMode,
+    selectedEntity, setSelectedEntity,
+    reward, setReward,
+    tasks, habits, isSaving,
+    handleComplete, toggleTimer, resetTimer, formatTime
+  } = useTimer();
 
   useEffect(() => {
     if (location.state?.selectedEntity) {
       setSelectedEntity(location.state.selectedEntity);
     }
-  }, [location.state?.selectedEntity]);
-
-  useEffect(() => {
-    const handleActivity = () => {
-      lastActivityRef.current = Date.now();
-    };
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('click', handleActivity);
-    return () => {
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('click', handleActivity);
-    };
-  }, []);
-
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    
-    // Fetch active Tasks
-    const qTasks = query(collection(db, 'tasks'), where('userId', '==', user.uid), where('completed', '==', false));
-    const unsubscribeTasks = onSnapshot(qTasks, (snap) => {
-      const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-      setTasks(taskList);
-      // Auto-select first item if nothing is selected
-      if (taskList.length > 0 && !selectedEntity) setSelectedEntity(`task:${taskList[0].id}`);
-    });
-
-    // Fetch active Habits
-    const qHabits = query(collection(db, 'habits'), where('userId', '==', user.uid), where('archived', '==', false));
-    const unsubscribeHabits = onSnapshot(qHabits, (snap) => {
-      const habitList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Habit));
-      setHabits(habitList);
-      if (habitList.length > 0 && !selectedEntity && tasks.length === 0) setSelectedEntity(`habit:${habitList[0].id}`);
-    });
-
-    return () => {
-      unsubscribeTasks();
-      unsubscribeHabits();
-    };
-  }, [user]);
-
-  useEffect(() => {
-    if (isActive) {
-      timerRef.current = setInterval(() => {
-        if (timerType === 'pomodoro') {
-          setTimeLeft(prev => {
-            if (prev <= 1) {
-              handleComplete();
-              return 0;
-            }
-            return prev - 1;
-          });
-        } else {
-          setElapsedTime(prev => prev + 1);
-        }
-        
-        // Reminder every 30 mins
-        const currentTotal = timerType === 'pomodoro' ? (focusMins * 60 - timeLeft) : elapsedTime;
-        if (currentTotal > 0 && currentTotal % 1800 === 0 && currentTotal !== lastReminderRef.current) {
-          lastReminderRef.current = currentTotal;
-          new Notification("Deep Focus Check", { body: "You've been focused for 30 minutes! Keep it steady." });
-        }
-
-        // Auto cut-off logic
-        const inactivityDuration = (Date.now() - lastActivityRef.current) / 1000;
-        const limit = (profile?.autoCutoffDuration || 60) * 60;
-        if (inactivityDuration > limit) {
-          setIsActive(false);
-          new Notification("Timer Auto Cut-off", { body: "The timer was stopped due to inactivity." });
-        }
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isActive, timerType, timeLeft, elapsedTime]);
-
-  const handleComplete = async (isManualStop: boolean = false) => {
-    if (isSaving) return;
-    setIsSaving(true);
-    setIsActive(false);
-    const sessionTime = timerType === 'pomodoro' ? (focusMins * 60) - timeLeft : elapsedTime;
-
-    try {
-      if (mode === 'focus' && sessionTime > 0) {
-        if (user) {
-          let type = 'task';
-          let entityId = 'none';
-          
-          if (selectedEntity) {
-            const parts = selectedEntity.split(':');
-            type = parts[0];
-            entityId = parts[1] || 'none';
-          }
-
-          await addDoc(collection(db, 'logs'), {
-            userId: user.uid,
-            entityId: entityId,
-            type: type as 'task' | 'habit',
-            date: new Date().toISOString().split('T')[0],
-            timeSpent: sessionTime,
-            completed: true,
-            timestamp: serverTimestamp()
-          });
-          
-          let taskName = 'General Focus';
-          if (type === 'task' && entityId !== 'none') {
-            taskName = tasks.find(t => t.id === entityId)?.title || 'Task';
-            // Mark task as completed if manual stop is used when working on a task
-            if (isManualStop) {
-              await updateDoc(doc(db, 'tasks', entityId), {
-                completed: true
-              });
-              setSelectedEntity('');
-            }
-          } else if (type === 'habit' && entityId !== 'none') {
-            taskName = habits.find(h => h.id === entityId)?.title || 'Habit';
-          }
-
-          const suggestion = await getRewardSuggestion(taskName);
-          setReward(suggestion);
-        }
-        
-        if (isManualStop) {
-          setMode('focus');
-          setTimeLeft(focusMins * 60);
-        } else if (timerType === 'pomodoro') {
-          setMode('break');
-          setTimeLeft(breakMins * 60);
-        }
-      } else if (mode === 'break') {
-        setMode('focus');
-        setTimeLeft(focusMins * 60);
-        setReward(null);
-      }
-
-      if (timerType === 'freestyle' || isManualStop) {
-        setElapsedTime(0);
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const toggleTimer = () => {
-    setIsActive(!isActive);
-  };
-  
-  const resetTimer = () => {
-    setIsActive(false);
-    setTimeLeft(mode === 'focus' ? focusMins * 60 : breakMins * 60);
-    setElapsedTime(0);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, [location.state?.selectedEntity, setSelectedEntity]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10 lg:gap-14 px-4 w-full max-w-4xl mx-auto">
       <div className="flex bg-slate-100 dark:bg-[#18191A] p-1 rounded-lg shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-300 dark:border-[#3E4042] w-full max-w-sm justify-center">
         <button 
           onClick={() => { setTimerType('pomodoro'); resetTimer(); }}
-          className={`flex-1 py-2.5 rounded-md font-medium transition-all ${timerType === 'pomodoro' ? 'bg-white dark:bg-[#242526] text-teal shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          disabled={isActive || elapsedTime > 0 || (timerType === 'pomodoro' && timeLeft < focusMins * 60)}
+          className={`flex-1 py-2.5 rounded-md font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${timerType === 'pomodoro' ? 'bg-white dark:bg-[#242526] text-teal shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
         >
           Pomodoro
         </button>
         <button 
           onClick={() => { setTimerType('freestyle'); resetTimer(); }}
-          className={`flex-1 py-2.5 rounded-md font-medium transition-all ${timerType === 'freestyle' ? 'bg-white dark:bg-[#242526] text-purple shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          disabled={isActive || elapsedTime > 0 || (timerType === 'pomodoro' && timeLeft < focusMins * 60)}
+          className={`flex-1 py-2.5 rounded-md font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${timerType === 'freestyle' ? 'bg-white dark:bg-[#242526] text-purple shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
         >
           Freestyle
         </button>
@@ -218,7 +47,7 @@ const FocusPage: React.FC = () => {
 
       <div className="text-center space-y-4 md:space-y-6 w-full">
         <div className="flex items-center justify-center gap-2">
-          {timerType === 'pomodoro' && !isActive ? (
+          {timerType === 'pomodoro' && !isActive && (mode === 'focus' ? timeLeft >= focusMins * 60 : timeLeft >= breakMins * 60) ? (
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#18191A] px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-widest text-teal transition-colors border border-transparent focus-within:border-teal/30 focus-within:bg-teal/5">
               <Settings2 size={16} />
               <input 
@@ -257,7 +86,8 @@ const FocusPage: React.FC = () => {
           <select 
             value={selectedEntity}
             onChange={(e) => setSelectedEntity(e.target.value)}
-            className="w-full p-4 rounded-lg bg-white dark:bg-[#242526] border border-slate-300 dark:border-[#3E4042] text-lg font-medium outline-none focus:border-teal transition-all cursor-pointer shadow-md shadow-slate-200/50 dark:shadow-none"
+            disabled={isActive || elapsedTime > 0 || (timerType === 'pomodoro' && Math.floor(timeLeft) < focusMins * 60)}
+            className="w-full p-4 rounded-lg bg-white dark:bg-[#242526] border border-slate-300 dark:border-[#3E4042] text-lg font-medium outline-none focus:border-teal transition-all cursor-pointer shadow-md shadow-slate-200/50 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="" disabled>Select something to work on</option>
             {tasks.length > 0 && (
