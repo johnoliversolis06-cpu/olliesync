@@ -62,6 +62,7 @@ export type BudgetItem = {
 export type JournalEntry = {
   id: string;
   userId: string;
+  title: string;
   content: string; // Markdown or plain text
   mood: 'great' | 'good' | 'neutral' | 'bad' | 'awful' | null;
   tags: string[];

@@ -15,6 +15,7 @@ export default function Journal() {
   
   // Editor state
   const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mood, setMood] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -54,12 +55,14 @@ export default function Journal() {
     if (activeEntryId) {
       const entry = entries.find(e => e.id === activeEntryId);
       if (entry) {
+        setTitle(entry.title || '');
         setContent(entry.content);
         setMood(entry.mood);
         setTags(entry.tags || []);
         setIsEditing(false);
       }
     } else {
+      setTitle('');
       setContent('');
       setMood(null);
       setTags([]);
@@ -69,6 +72,7 @@ export default function Journal() {
 
   const handleCreateNew = () => {
     setActiveEntryId(null);
+    setTitle('');
     setContent('');
     setMood(null);
     setTags([]);
@@ -95,6 +99,7 @@ export default function Journal() {
       if (activeEntryId) {
         // Update existing
         await updateDoc(doc(db, 'journal', activeEntryId), {
+          title: title || 'Untitled',
           content,
           mood,
           tags,
@@ -104,6 +109,7 @@ export default function Journal() {
         // Create new
         const newDocRef = await addDoc(collection(db, 'journal'), {
           userId: user.uid,
+          title: title || 'Untitled',
           content,
           mood,
           tags,
@@ -152,6 +158,7 @@ export default function Journal() {
     if (!searchQuery) return true;
     const lowerQuery = searchQuery.toLowerCase();
     return e.content.toLowerCase().includes(lowerQuery) || 
+           (e.title && e.title.toLowerCase().includes(lowerQuery)) ||
            (e.tags && e.tags.some(t => t.toLowerCase().includes(lowerQuery)));
   });
 
@@ -181,6 +188,21 @@ export default function Journal() {
               <Plus size={18} />
             </button>
           </div>
+          
+          <div className="mb-4 flex items-center justify-between bg-white dark:bg-[#242526] p-3 rounded-xl border border-slate-200 dark:border-[#3E4042] shadow-sm">
+            <div className="text-center">
+              <div className="text-lg font-bold text-teal">{entries.length}</div>
+              <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Entries</div>
+            </div>
+            <div className="w-px h-8 bg-slate-200 dark:bg-[#3E4042]"></div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-amber-500">
+                {entries.filter(e => e.mood === 'great' || e.mood === 'good').length}
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Positive</div>
+            </div>
+          </div>
+
           <div className="relative">
             <input 
               type="text"
@@ -217,7 +239,8 @@ export default function Journal() {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-gray-100 mb-2">
+                <h4 className="font-bold text-slate-800 dark:text-gray-100 mb-1">{entry.title || 'Untitled'}</h4>
+                <p className="text-sm font-medium line-clamp-2 text-slate-500 dark:text-slate-400 mb-2">
                   {entry.content || "Empty entry..."}
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -316,16 +339,26 @@ export default function Journal() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col gap-4">
               {isEditing ? (
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="What's on your mind? (Supports Markdown)"
-                  className="w-full h-full min-h-[300px] resize-none outline-none bg-transparent text-slate-800 dark:text-gray-100 text-base sm:text-lg leading-relaxed placeholder:text-slate-400"
-                />
+                <>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Entry Title"
+                    className="w-full bg-transparent text-2xl sm:text-3xl font-bold text-slate-800 dark:text-gray-100 outline-none placeholder:text-slate-300 dark:placeholder:text-[#3E4042]"
+                  />
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="What's on your mind? (Supports Markdown)"
+                    className="w-full h-full min-h-[300px] resize-none outline-none bg-transparent text-slate-800 dark:text-gray-100 text-base sm:text-lg leading-relaxed placeholder:text-slate-400"
+                  />
+                </>
               ) : (
                 <div className="prose prose-slate dark:prose-invert max-w-none text-slate-800 dark:text-gray-100 markdown-body">
+                  <h1 className="text-3xl font-bold mb-6">{title || 'Untitled'}</h1>
                   <Markdown>{content || '*Empty entry*'}</Markdown>
                 </div>
               )}

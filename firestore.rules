@@ -63,6 +63,7 @@ service cloud.firestore {
 
     function isValidJournalEntry(data) {
       return data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
              data.content is string && 
              (data.mood == null || data.mood in ['great', 'good', 'neutral', 'bad', 'awful']) &&
              data.tags is list && data.tags.size() <= 20;
