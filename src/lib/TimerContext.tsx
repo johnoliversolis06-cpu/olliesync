@@ -26,6 +26,7 @@ interface TimerContextType {
   setReward: (reward: { reward: string, message: string } | null) => void;
   tasks: Task[];
   habits: Habit[];
+  todayLogs: any[];
   isSaving: boolean;
   handleComplete: (isManualStop?: boolean) => Promise<void>;
   toggleTimer: () => void;
@@ -50,6 +51,8 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<string>('');
   const [reward, setReward] = useState<{ reward: string, message: string } | null>(null);
+
+  const [todayLogs, setTodayLogs] = useState<any[]>([]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const handleCompleteRef = useRef<(isManualStop?: boolean) => void>(() => {});
@@ -99,7 +102,13 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (habitList.length > 0 && !selectedEntity && tasks.length === 0) setSelectedEntity(`habit:${habitList[0].id}`);
     });
 
-    return () => { unsubscribeTasks(); unsubscribeHabits(); };
+    const todayStr = new Date().toISOString().split('T')[0];
+    const qLogs = query(collection(db, 'logs'), where('userId', '==', user.uid), where('date', '==', todayStr));
+    const unsubscribeLogs = onSnapshot(qLogs, (snap) => {
+      setTodayLogs(snap.docs.map(doc => doc.data()));
+    });
+
+    return () => { unsubscribeTasks(); unsubscribeHabits(); unsubscribeLogs(); };
   }, [user]);
 
   useEffect(() => {
@@ -246,7 +255,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       mode, setMode,
       selectedEntity, setSelectedEntity,
       reward, setReward,
-      tasks, habits, isSaving,
+      tasks, habits, todayLogs, isSaving,
       handleComplete, toggleTimer, resetTimer, formatTime
     }}>
       {children}

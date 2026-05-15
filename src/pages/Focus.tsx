@@ -16,9 +16,11 @@ const FocusPage: React.FC = () => {
     mode, setMode,
     selectedEntity, setSelectedEntity,
     reward, setReward,
-    tasks, habits, isSaving,
+    tasks, habits, todayLogs, isSaving,
     handleComplete, toggleTimer, resetTimer, formatTime
   } = useTimer();
+
+  const activeHabits = habits.filter(h => !todayLogs.some(log => log.entityId === h.id && log.type === 'habit'));
 
   useEffect(() => {
     if (location.state?.selectedEntity) {
@@ -97,9 +99,9 @@ const FocusPage: React.FC = () => {
                 ))}
               </optgroup>
             )}
-            {habits.length > 0 && (
+            {activeHabits.length > 0 && (
               <optgroup label="Habits">
-                {habits.map(habit => (
+                {activeHabits.map(habit => (
                   <option key={habit.id} value={`habit:${habit.id}`}>[Habit] {habit.title}</option>
                 ))}
               </optgroup>

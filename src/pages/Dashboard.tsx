@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc,  orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, orderBy, limit, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Task, Habit } from '../types';
 import { generateQuote } from '../services/gemini';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Play, Circle, Flame, Sparkles, Plus, Activity } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTimer } from '../lib/TimerContext';
 
 const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { isActive, handleComplete } = useTimer();
   const [quote, setQuote] = useState<{ text: string, author: string } | null>(null);
   
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -85,12 +87,9 @@ const Dashboard: React.FC = () => {
     if (isCompleted) {
       const log = logs.find(l => l.entityId === habitId && l.date === todayStr);
       if (log) {
-        // Need to import deleteDoc and addDoc
-        const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(db, 'logs', log.id));
       }
     } else {
-      const { addDoc, serverTimestamp } = await import('firebase/firestore');
       await addDoc(collection(db, 'logs'), {
         userId: user.uid,
         entityId: habitId,
@@ -100,6 +99,18 @@ const Dashboard: React.FC = () => {
         completed: true,
         timestamp: serverTimestamp()
       });
+    }
+  };
+
+  const handlePlay = async (e: React.MouseEvent, entityId: string) => {
+    e.stopPropagation();
+    if (isActive) {
+      if (window.confirm("There is an ongoing session. Would you like to stop it to switch to this?")) {
+        await handleComplete(true);
+        navigate('/focus', { state: { selectedEntity: entityId } });
+      }
+    } else {
+      navigate('/focus', { state: { selectedEntity: entityId } });
     }
   };
 
@@ -183,7 +194,7 @@ const Dashboard: React.FC = () => {
                       <span className="font-medium text-base text-slate-800 dark:text-gray-200 line-clamp-1">{task.title}</span>
                     </div>
                     <button 
-                      onClick={() => navigate('/focus', { state: { selectedEntity: `task:${task.id}` } })}
+                      onClick={(e) => handlePlay(e, `task:${task.id}`)}
                       className="ml-3 opacity-0 group-hover:opacity-100 bg-teal/10 text-teal p-2.5 rounded-md hover:bg-teal hover:text-white transition-all transform hover:scale-105 active:scale-95"
                       title="Focus on this"
                     >
@@ -244,7 +255,7 @@ const Dashboard: React.FC = () => {
                       <span className={`font-medium text-base text-slate-800 dark:text-gray-200 line-clamp-1 ${isCompletedToday ? 'text-teal' : ''}`}>{habit.title}</span>
                     </div>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); navigate('/focus', { state: { selectedEntity: `habit:${habit.id}` } })}}
+                      onClick={(e) => handlePlay(e, `habit:${habit.id}`)}
                       className="ml-3 opacity-0 group-hover:opacity-100 bg-purple/10 text-purple p-2.5 rounded-md hover:bg-purple hover:text-white transition-all transform hover:scale-105 active:scale-95"
                       title="Focus on this"
                     >

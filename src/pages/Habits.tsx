@@ -13,7 +13,7 @@ import EditHabitModal from '../components/EditHabitModal';
 const HabitsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setSelectedEntity, setIsActive } = useTimer();
+  const { setSelectedEntity, setIsActive, isActive, handleComplete } = useTimer();
   const [habits, setHabits] = useState<Habit[]>([]);
   
   const [logs, setLogs] = useState<Log[]>([]);
@@ -108,6 +108,18 @@ const HabitsPage: React.FC = () => {
 
   const deleteHabit = async (id: string) => {
     await deleteDoc(doc(db, 'habits', id));
+  };
+
+  const handlePlay = async (e: React.MouseEvent, entityId: string) => {
+    e.stopPropagation();
+    if (isActive) {
+      if (window.confirm("There is an ongoing session. Would you like to stop it to switch to this habit?")) {
+        await handleComplete(true);
+        navigate('/focus', { state: { selectedEntity: entityId } });
+      }
+    } else {
+      navigate('/focus', { state: { selectedEntity: entityId } });
+    }
   };
 
   const filteredLibrary = PREDEFINED_ROUTINES.find(c => c.category === selectedCategory)?.habits.filter(h => 
@@ -209,10 +221,7 @@ const HabitsPage: React.FC = () => {
                     
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          navigate('/focus', { state: { selectedEntity: `habit:${habit.id}` } });
-                        }}
+                        onClick={(e) => handlePlay(e, `habit:${habit.id}`)}
                         title="Start Timer"
                         className="p-2 text-slate-400 hover:text-teal hover:bg-teal/10 rounded-lg transition-all"
                       >

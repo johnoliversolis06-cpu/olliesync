@@ -8,6 +8,8 @@ import { Plus, Trash2, CheckCircle2, Circle, Play, Settings2 } from 'lucide-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import EditTaskModal from '../components/EditTaskModal';
 
+import { useTimer } from '../lib/TimerContext';
+
 const TIME_PERIODS = [
   { id: 'morning', label: 'Morning Tasks', color: 'text-amber-500' },
   { id: 'afternoon', label: 'Afternoon Tasks', color: 'text-orange-500' },
@@ -18,6 +20,7 @@ const TIME_PERIODS = [
 const TasksPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isActive, handleComplete } = useTimer();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
@@ -56,6 +59,18 @@ const TasksPage: React.FC = () => {
 
   const deleteTask = async (id: string) => {
     await deleteDoc(doc(db, 'tasks', id));
+  };
+
+  const handlePlay = async (e: React.MouseEvent, entityId: string) => {
+    e.stopPropagation();
+    if (isActive) {
+      if (window.confirm("There is an ongoing session. Would you like to stop it to switch to this task?")) {
+        await handleComplete(true);
+        navigate('/focus', { state: { selectedEntity: entityId } });
+      }
+    } else {
+      navigate('/focus', { state: { selectedEntity: entityId } });
+    }
   };
 
   const activeTasks = tasks.filter(t => !t.completed).sort((a, b) => {
@@ -152,7 +167,7 @@ const TasksPage: React.FC = () => {
 
                         <div className="flex items-center gap-1">
                             <button 
-                              onClick={(e) => { e.stopPropagation(); navigate('/focus', { state: { selectedEntity: `task:${task.id}` } }); }}
+                              onClick={(e) => handlePlay(e, `task:${task.id}`)}
                               className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-teal hover:bg-teal/10 rounded-lg transition-all flex-shrink-0" title="Focus"
                             >
                               <Play size={20} fill="currentColor" />
